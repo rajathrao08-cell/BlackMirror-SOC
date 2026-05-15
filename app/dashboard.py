@@ -48,7 +48,10 @@ body {
 }
 </style>
 """, unsafe_allow_html=True)
-run_packet_monitor()
+#run_packet_monitor()
+if st.button("Start Live Capture"):
+    start_packet_monitor()
+    st.success("Packet capture started")
 
 # ---------------- HEADER ----------------
 st.title("BlackMirror SOC")

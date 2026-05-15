@@ -24,7 +24,8 @@ def start_sniffing():
 
     sniff(
         prn=process_packet,
-        store=False
+        store=False,
+        count=50
     )
 
 # ---------------- BACKGROUND THREAD ----------------
