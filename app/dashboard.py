@@ -1,29 +1,36 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import random
-from datetime import datetime
+
 from log_monitor import analyze_logs
 from ai_engine import generate_ai_analysis
 from mitre_mapper import map_to_mitre
 from report_generator import generate_pdf_report
+
 from packet_monitor import (
-    run_packet_monitor,
-    get_traffic_stats
+    traffic_stats,
+    run_packet_monitor
 )
+
 from network_scanner import scan_network
 
-# ---------------- PAGE CONFIG ----------------
+# ---------------------------------------------------
+# PAGE CONFIG
+# ---------------------------------------------------
+
 st.set_page_config(
-    page_title="BlackMirror SOC",
+    page_title="BlackMirror-XDR",
     page_icon="🛡️",
     layout="wide"
 )
 
+# ---------------------------------------------------
+# CUSTOM CSS
+# ---------------------------------------------------
 
-# ---------------- CUSTOM CSS ----------------
 st.markdown("""
 <style>
+
 body {
     background-color: #0d1117;
     color: white;
@@ -37,35 +44,36 @@ body {
     text-align: center;
 }
 
-.alert-box {
-    background-color: #2d1117;
-    padding: 15px;
-    border-radius: 10px;
-    border-left: 5px solid red;
-    margin-bottom: 10px;
-    color: white;
-    font-weight: bold;
-}
 </style>
 """, unsafe_allow_html=True)
-#run_packet_monitor()
-if st.button("Start Live Capture"):
-    start_packet_monitor()
-    st.success("Packet capture started")
 
-# ---------------- HEADER ----------------
-st.title("BlackMirror SOC")
-st.subheader("AI-Powered Threat Intelligence Platform")
+# ---------------------------------------------------
+# START PACKET MONITOR
+# ---------------------------------------------------
+
+if "monitor_started" not in st.session_state:
+    run_packet_monitor()
+    st.session_state.monitor_started = True
+
+# ---------------------------------------------------
+# HEADER
+# ---------------------------------------------------
+
+st.title("🛡️ BlackMirror-XDR")
+st.subheader("AI-Powered SOC & Network Monitoring Platform")
 
 st.markdown("---")
 
-# ---------------- METRICS ----------------
-col1, col2, col3, col4 = st.columns(4)
+# ---------------------------------------------------
+# LOAD ALERTS
+# ---------------------------------------------------
 
-# ---------------- LOAD ALERTS ----------------
 alerts = analyze_logs("logs/security_logs.txt")
 
-# ---------------- METRIC CALCULATIONS ----------------
+# ---------------------------------------------------
+# METRICS
+# ---------------------------------------------------
+
 total_threats = len(alerts)
 
 critical_alerts = len([
@@ -80,7 +88,8 @@ high_alerts = len([
 
 system_health = max(100 - (total_threats * 2), 65)
 
-# ---------------- DISPLAY METRICS ----------------
+col1, col2, col3, col4 = st.columns(4)
+
 with col1:
     st.metric("Threats Detected", total_threats)
 
@@ -95,16 +104,17 @@ with col4:
 
 st.markdown("---")
 
-# ---------------- LIVE THREAT FEED ----------------
-st.header(" Live Threat Feed")
+# ---------------------------------------------------
+# LIVE THREAT FEED
+# ---------------------------------------------------
 
+st.header("🚨 Live Threat Feed")
 
-for alert in alerts:
+for index, alert in enumerate(alerts):
 
     severity = alert["severity"]
     message = alert["message"]
 
-    
     mitre_data = map_to_mitre(alert)
 
     if severity == "CRITICAL":
@@ -139,31 +149,29 @@ for alert in alerts:
 
         st.markdown("### MITRE ATT&CK Mapping")
 
-st.write(f"**Tactic:** {mitre_data['tactic']}")
-st.write(f"**Technique:** {mitre_data['technique']}")
+        st.write(f"**Tactic:** {mitre_data['tactic']}")
+        st.write(f"**Technique:** {mitre_data['technique']}")
+
+        if st.button(
+            f"Analyze with AI - {message[:20]}",
+            key=f"ai_button_{index}"
+        ):
+
+            with st.spinner("Generating AI analysis..."):
+
+                ai_analysis = generate_ai_analysis(alert)
+
+                st.markdown("### 🤖 AI Threat Analysis")
+
+                st.write(ai_analysis)
 
 st.markdown("---")
 
-st.markdown("### MITRE ATT&CK Mapping")
+# ---------------------------------------------------
+# THREAT ANALYTICS
+# ---------------------------------------------------
 
-st.write(f"**Tactic:** {mitre_data['tactic']}")
-st.write(f"**Technique:** {mitre_data['technique']}")
-
-st.markdown("---")
-
-if st.button(f"Analyze Alert with AI - {message[:20]}"):
-
-    with st.spinner("Generating AI threat analysis..."):
-
-        ai_analysis = generate_ai_analysis(alert)
-
-        st.markdown("### AI Threat Analysis")
-
-        st.write(ai_analysis)
-st.markdown("---")
-
-# ---------------- THREAT ANALYTICS ----------------
-st.header("Threat Analytics")
+st.header("📊 Threat Analytics")
 
 data = pd.DataFrame({
     "Attack Type": [
@@ -185,9 +193,13 @@ fig = px.bar(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ---------------- FOOTER ----------------
-# ---------------- ATTACK TIMELINE ----------------
-st.header("Attack Timeline")
+# ---------------------------------------------------
+# ATTACK TIMELINE
+# ---------------------------------------------------
+
+st.markdown("---")
+
+st.header("📈 Attack Timeline")
 
 timeline_data = pd.DataFrame({
     "Time": [
@@ -212,40 +224,20 @@ timeline_fig = px.line(
 )
 
 st.plotly_chart(timeline_fig, use_container_width=True)
-st.markdown("---")
-# ---------------- PDF REPORT GENERATION ----------------
-st.markdown("---")
 
-st.header(" Incident Report Generation")
+# ---------------------------------------------------
+# LIVE NETWORK TRAFFIC
+# ---------------------------------------------------
 
-if st.button("Generate Incident Report"):
-
-    report_path = generate_pdf_report(alerts)
-
-    st.success("Incident report generated successfully!")
-
-    with open(report_path, "rb") as pdf_file:
-
-        st.download_button(
-            label="⬇️ Download Incident Report",
-            data=pdf_file,
-            file_name="BlackMirror_SOC_Report.pdf",
-            mime="application/pdf"
-        )
-# ---------------- NETWORK MONITORING ----------------
-# ---------------- LIVE NETWORK MONITORING ----------------
-# ---------------- LIVE NETWORK MONITORING ----------------
 st.markdown("---")
 
-st.header("Live Network Traffic")
+st.header("📡 Real-Time Network Traffic")
 
-traffic_data = get_traffic_stats()
-
-if traffic_data:
+if traffic_stats:
 
     packet_df = pd.DataFrame({
-        "Source IP": list(traffic_data.keys()),
-        "Packet Count": list(traffic_data.values())
+        "Source IP": list(traffic_stats.keys()),
+        "Packet Count": list(traffic_stats.values())
     })
 
     st.dataframe(packet_df)
@@ -263,25 +255,67 @@ else:
 
     st.info("Waiting for network traffic...")
 
-# ---------------- NETWORK ASSET DISCOVERY ----------------
+# ---------------------------------------------------
+# NETWORK ASSET DISCOVERY
+# ---------------------------------------------------
+
 st.markdown("---")
 
-st.header("Network Asset Discovery")
+st.header("🖥️ Network Asset Discovery")
 
 if st.button("Scan Local Network"):
 
-    with st.spinner("Scanning network..."):
+    with st.spinner("Scanning local devices..."):
 
-        devices = scan_network()
+        try:
 
-        if devices:
+            devices = scan_network()
 
-            st.success(f"Found {len(devices)} devices")
+            if devices:
 
-            for device in devices:
-                st.write(
-                    f"IP: {device['ip']} | MAC: {device['mac']}"
-                )
+                st.success(f"Found {len(devices)} devices")
 
-        else:
-            st.warning("No devices found.")
+                device_df = pd.DataFrame(devices)
+
+                st.dataframe(device_df, use_container_width=True)
+
+            else:
+
+                st.warning("No devices found.")
+
+        except Exception as e:
+
+            st.error(f"Network scan failed: {e}")
+
+# ---------------------------------------------------
+# INCIDENT REPORT GENERATION
+# ---------------------------------------------------
+
+st.markdown("---")
+
+st.header("📄 Incident Report Generation")
+
+if st.button("Generate Incident Report"):
+
+    report_path = generate_pdf_report(alerts)
+
+    st.success("Incident report generated successfully!")
+
+    with open(report_path, "rb") as pdf_file:
+
+        st.download_button(
+            label="⬇️ Download Incident Report",
+            data=pdf_file,
+            file_name="BlackMirror_XDR_Report.pdf",
+            mime="application/pdf"
+        )
+
+# ---------------------------------------------------
+# FOOTER
+# ---------------------------------------------------
+
+st.markdown("---")
+
+st.caption(
+    "BlackMirror-XDR | Python • Streamlit • Scapy • AI Security Analytics"
+)
