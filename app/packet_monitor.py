@@ -1,19 +1,43 @@
 from scapy.all import sniff
 from collections import Counter
+from threading import Thread
 
+# ---------------- GLOBAL TRAFFIC STORAGE ----------------
+traffic_stats = Counter()
 
-def capture_packets(packet_count=20):
+# ---------------- PACKET PROCESSOR ----------------
+def process_packet(packet):
 
-    packets = sniff(count=packet_count)
-
-    ip_counter = Counter()
-
-    for packet in packets:
+    try:
 
         if packet.haslayer("IP"):
 
             src_ip = packet["IP"].src
 
-            ip_counter[src_ip] += 1
+            traffic_stats[src_ip] += 1
 
-    return ip_counter
+    except:
+        pass
+
+# ---------------- START SNIFFER ----------------
+def start_sniffing():
+
+    sniff(
+        prn=process_packet,
+        store=False,
+        count=50
+    )
+
+# ---------------- BACKGROUND THREAD ----------------
+def run_packet_monitor():
+
+    sniffer_thread = Thread(target=start_sniffing)
+
+    sniffer_thread.daemon = True
+
+    sniffer_thread.start()
+
+# ---------------- FETCH LIVE STATS ----------------
+def get_traffic_stats():
+
+    return dict(traffic_stats)
