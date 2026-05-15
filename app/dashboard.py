@@ -7,13 +7,19 @@ from log_monitor import analyze_logs
 from ai_engine import generate_ai_analysis
 from mitre_mapper import map_to_mitre
 from report_generator import generate_pdf_report
-from packet_monitor import capture_packets
+from packet_monitor import (
+    run_packet_monitor,
+    get_traffic_stats
+)
+from network_scanner import scan_network
+
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="BlackMirror SOC",
     page_icon="🛡️",
     layout="wide"
 )
+
 
 # ---------------- CUSTOM CSS ----------------
 st.markdown("""
@@ -42,9 +48,10 @@ body {
 }
 </style>
 """, unsafe_allow_html=True)
+run_packet_monitor()
 
 # ---------------- HEADER ----------------
-st.title("🛡️ BlackMirror SOC")
+st.title("BlackMirror SOC")
 st.subheader("AI-Powered Threat Intelligence Platform")
 
 st.markdown("---")
@@ -86,7 +93,7 @@ with col4:
 st.markdown("---")
 
 # ---------------- LIVE THREAT FEED ----------------
-st.header("🚨 Live Threat Feed")
+st.header(" Live Threat Feed")
 
 
 for alert in alerts:
@@ -94,7 +101,7 @@ for alert in alerts:
     severity = alert["severity"]
     message = alert["message"]
 
-    ai_analysis = generate_ai_analysis(alert)
+    
     mitre_data = map_to_mitre(alert)
 
     if severity == "CRITICAL":
@@ -127,27 +134,33 @@ for alert in alerts:
             unsafe_allow_html=True
         )
 
-        st.markdown("### 🎯 MITRE ATT&CK Mapping")
+        st.markdown("### MITRE ATT&CK Mapping")
 
 st.write(f"**Tactic:** {mitre_data['tactic']}")
 st.write(f"**Technique:** {mitre_data['technique']}")
 
 st.markdown("---")
 
-st.markdown("### 🎯 MITRE ATT&CK Mapping")
+st.markdown("### MITRE ATT&CK Mapping")
 
 st.write(f"**Tactic:** {mitre_data['tactic']}")
 st.write(f"**Technique:** {mitre_data['technique']}")
 
 st.markdown("---")
 
-st.markdown("### 🤖 AI Threat Analysis")
+if st.button(f"Analyze Alert with AI - {message[:20]}"):
 
-st.write(ai_analysis)
+    with st.spinner("Generating AI threat analysis..."):
+
+        ai_analysis = generate_ai_analysis(alert)
+
+        st.markdown("### AI Threat Analysis")
+
+        st.write(ai_analysis)
 st.markdown("---")
 
 # ---------------- THREAT ANALYTICS ----------------
-st.header("📊 Threat Analytics")
+st.header("Threat Analytics")
 
 data = pd.DataFrame({
     "Attack Type": [
@@ -171,7 +184,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ---------------- FOOTER ----------------
 # ---------------- ATTACK TIMELINE ----------------
-st.header("📈 Attack Timeline")
+st.header("Attack Timeline")
 
 timeline_data = pd.DataFrame({
     "Time": [
@@ -200,7 +213,7 @@ st.markdown("---")
 # ---------------- PDF REPORT GENERATION ----------------
 st.markdown("---")
 
-st.header("📄 Incident Report Generation")
+st.header(" Incident Report Generation")
 
 if st.button("Generate Incident Report"):
 
@@ -217,31 +230,55 @@ if st.button("Generate Incident Report"):
             mime="application/pdf"
         )
 # ---------------- NETWORK MONITORING ----------------
+# ---------------- LIVE NETWORK MONITORING ----------------
+# ---------------- LIVE NETWORK MONITORING ----------------
 st.markdown("---")
 
-st.header("🌐 Live Network Monitoring")
+st.header("Live Network Traffic")
 
-if st.button("Start Packet Capture"):
+traffic_data = get_traffic_stats()
 
-    with st.spinner("Capturing network packets..."):
+if traffic_data:
 
-        packet_data = capture_packets(20)
+    packet_df = pd.DataFrame({
+        "Source IP": list(traffic_data.keys()),
+        "Packet Count": list(traffic_data.values())
+    })
 
-        packet_df = pd.DataFrame({
-            "Source IP": list(packet_data.keys()),
-            "Packet Count": list(packet_data.values())
-        })
+    st.dataframe(packet_df)
 
-        st.subheader("Captured Traffic")
+    packet_fig = px.bar(
+        packet_df,
+        x="Source IP",
+        y="Packet Count",
+        title="Real-Time Network Activity"
+    )
 
-        st.dataframe(packet_df)
+    st.plotly_chart(packet_fig, use_container_width=True)
 
-        packet_fig = px.bar(
-            packet_df,
-            x="Source IP",
-            y="Packet Count",
-            title="Network Traffic Analysis"
-        )
+else:
 
-        st.plotly_chart(packet_fig, use_container_width=True)      
-st.caption(f"BlackMirror SOC | {datetime.now()}")
+    st.info("Waiting for network traffic...")
+
+# ---------------- NETWORK ASSET DISCOVERY ----------------
+st.markdown("---")
+
+st.header("Network Asset Discovery")
+
+if st.button("Scan Local Network"):
+
+    with st.spinner("Scanning network..."):
+
+        devices = scan_network()
+
+        if devices:
+
+            st.success(f"Found {len(devices)} devices")
+
+            for device in devices:
+                st.write(
+                    f"IP: {device['ip']} | MAC: {device['mac']}"
+                )
+
+        else:
+            st.warning("No devices found.")
